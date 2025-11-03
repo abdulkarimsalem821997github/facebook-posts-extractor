@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Facebook Posts Extractor",
+  "version": "1.0",
+  "description": "استخراج المنشورات من فيسبوك وحفظها كملف Excel",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://web.facebook.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Facebook Posts Extractor"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/",
+        "https://www.facebook.com/?*",
+        "https://web.facebook.com/",
+        "https://web.facebook.com/?*"
+      ],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
