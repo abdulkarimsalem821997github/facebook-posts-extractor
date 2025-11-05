@@ -1,8 +1,7 @@
 // ========== فحص التحميل المزدوج ==========
 if (window.facebookExtractorLoaded) {
-    console.log('⚠️ Facebook Extractor محمل مسبقاً، تخطي التحميل المزدوج');
-    throw new Error('Facebook Extractor already loaded');
-}
+    console.warn('⚠️ Facebook Extractor محمل مسبقاً، تخطي التحميل المزدوج');
+}else{
 window.facebookExtractorLoaded = true;
 
 // ========== إعدادات الاستخراج ==========
@@ -29,10 +28,10 @@ chrome.runtime.sendMessage({
 // ========== نظام معالجة الرسائل ==========
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('📩 content script استلم:', request.action);
-    
+
     // إرسال رد فوري أولاً
     sendResponse({ received: true });
-    
+
     // معالجة الطلب
     handleMessage(request).then(result => {
         if (result && request.needResponse) {
@@ -46,7 +45,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: 'error'
         });
     });
-    
+
     return true; // إبقاء القناة مفتوحة للردود غير المتزامنة
 });
 
@@ -54,19 +53,19 @@ async function handleMessage(request) {
     switch (request.action) {
         case 'ping':
             return { success: true, message: 'متصل وجاهز' };
-            
+
         case 'startExtraction':
             await startExtraction();
             return { success: true, message: 'بدأ الاستخراج' };
-            
+
         case 'stopExtraction':
             stopExtraction();
             return { success: true, message: 'توقف الاستخراج' };
-            
+
         case 'downloadCSV':
             downloadCSV();
             return { success: true, message: 'بدأ التنزيل' };
-            
+
         case 'getStats':
             return {
                 action: 'currentStats',
@@ -77,7 +76,7 @@ async function handleMessage(request) {
                     totalShares: extractedPosts.reduce((sum, post) => sum + post.shares, 0)
                 }
             };
-            
+
         default:
             throw new Error(`إجراء غير معروف: ${request.action}`);
     }
@@ -89,27 +88,27 @@ async function startExtraction() {
         sendStatus('⚠️ الاستخراج يعمل بالفعل', 'warning');
         return;
     }
-    
+
     extractionActive = true;
     extractedPosts = [];
     scrollCount = 0;
-    
+
     sendStatus('🚀 بدء استخراج المنشورات...', 'info');
     sendProgress(0);
-    
+
     // بدء التمرير التلقائي
     startAutoScroll();
 }
 
 function stopExtraction() {
     if (!extractionActive) return;
-    
+
     extractionActive = false;
     if (scrollInterval) {
         clearInterval(scrollInterval);
         scrollInterval = null;
     }
-    
+
     sendStatus(`⏹️ توقف الاستخراج - تم جمع ${extractedPosts.length} منشور`, 'warning');
     sendProgress(0);
 }
@@ -122,25 +121,25 @@ function startAutoScroll() {
             }
             return;
         }
-        
+
         // التمرير لأسفل
         window.scrollBy(0, window.innerHeight * 2);
         scrollCount++;
-        
+
         // تحديث التقدم
         const progress = (scrollCount / EXTRACTION_SETTINGS.SCROLL_TIMES) * 100;
         sendProgress(progress);
-        
+
         // استخراج المنشورات
         await extractAndProcessPosts();
-        
+
         sendStatus(`↕️ التمريرة ${scrollCount}/${EXTRACTION_SETTINGS.SCROLL_TIMES} - ${extractedPosts.length} منشور`);
-        
+
         // إيقاف إذا وصلنا للحد الأقصى
         if (extractedPosts.length >= EXTRACTION_SETTINGS.MAX_POSTS) {
             extractionComplete();
         }
-        
+
     }, EXTRACTION_SETTINGS.SCROLL_DELAY);
 }
 
@@ -148,20 +147,20 @@ async function extractAndProcessPosts() {
     try {
         const newPosts = extractPostsFromFeed();
         const validPosts = validatePosts(newPosts);
-        
+
         if (validPosts.length > 0) {
             // تجنب التكرارات
-            const uniquePosts = validPosts.filter(newPost => 
+            const uniquePosts = validPosts.filter(newPost =>
                 !extractedPosts.some(existingPost => existingPost.postId === newPost.postId)
             );
-            
+
             extractedPosts = [...extractedPosts, ...uniquePosts];
             updateStats();
-            
+
             // إرسال عينة من المنشور الجديد
             if (uniquePosts.length > 0) {
                 console.log('📄 منشورات جديدة:', uniquePosts.length);
-                
+
                 uniquePosts.forEach((post, index) => {
                     console.log(`   ${index + 1}. ${post.author}: "${post.text.substring(0, 50)}..."`);
                 });
@@ -179,10 +178,10 @@ function extractionComplete() {
         clearInterval(scrollInterval);
         scrollInterval = null;
     }
-    
+
     sendStatus(`✅ اكتمل الاستخراج! تم جمع ${extractedPosts.length} منشور`, 'success');
     sendProgress(100);
-    
+
     chrome.runtime.sendMessage({
         action: 'extractionComplete',
         postCount: extractedPosts.length
@@ -212,7 +211,7 @@ function updateStats() {
         totalLikes: extractedPosts.reduce((sum, post) => sum + post.likes, 0),
         totalShares: extractedPosts.reduce((sum, post) => sum + post.shares, 0)
     };
-    
+
     chrome.runtime.sendMessage({
         action: 'updateStats',
         stats: stats
@@ -223,7 +222,7 @@ function updateStats() {
 function extractPostsFromFeed() {
     try {
         const posts = [];
-        
+
         // محددات المنشورات المحسنة
         const selectors = [
             'div[role="article"]',
@@ -232,7 +231,7 @@ function extractPostsFromFeed() {
             'div[data-ad-preview="message"]',
             '[data-pagelet*="MainFeed"] > div > div'
         ];
-        
+
         selectors.forEach(selector => {
             const elements = document.querySelectorAll(selector);
             elements.forEach(el => {
@@ -246,7 +245,7 @@ function extractPostsFromFeed() {
                 }
             });
         });
-        
+
         return posts;
     } catch (error) {
         console.error('❌ خطأ في extractPostsFromFeed:', error);
@@ -443,7 +442,7 @@ function extractPostData(element) {
                         const postDate = new Date(parseInt(utime) * 1000);
                         time = postDate.toLocaleString('ar-EG');
                         break;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 // المحاولة الثانية: من aria-label
@@ -571,7 +570,9 @@ function extractPostData(element) {
         } else if (author.includes(' shared ')) {
             postType = 'مشاركة';
         }
-
+        // const MAX_LENGTH = 1500;
+        // const isTruncated = text.length > MAX_LENGTH;
+        const isTruncated = /عرض المزيد|See more/i.test(text);
         return {
             postId,
             postUrl,
@@ -583,7 +584,8 @@ function extractPostData(element) {
             reactions: totalReactions,
             time,
             hasMedia,
-            postType
+            postType,
+            isTruncated
         };
 
     } catch (error) {
@@ -597,7 +599,7 @@ function validatePosts(posts) {
         if (!post || !post.text) return false;
         if (post.text.length < 15) return false;
         if (post.author === 'غير معروف') return false;
-        
+
         // تصفية المحتوى غير المرغوب
         const invalidPatterns = [
             'أشخاص قد تعرفهم',
@@ -607,13 +609,13 @@ function validatePosts(posts) {
             'صديق مشترك',
             'عرض الكل'
         ];
-        
+
         for (const pattern of invalidPatterns) {
             if (post.text.includes(pattern) || post.author.includes(pattern)) {
                 return false;
             }
         }
-        
+
         return true;
     });
 }
@@ -623,12 +625,12 @@ function downloadCSV() {
         sendStatus('❌ لا توجد بيانات للتنزيل', 'error');
         return;
     }
-    
+
     try {
         // تحويل البيانات إلى CSV
-        const headers = ['PostId', 'PostUrl', 'Author', 'Text', 'Comments', 'Likes', 'Shares', 'Reactions', 'PostTime', 'HasMedia', 'PostType'];
+        const headers = ['PostId', 'PostUrl', 'Author', 'Text', 'Comments', 'Likes', 'Shares', 'Reactions', 'PostTime', 'HasMedia', 'PostType', 'IsTruncated'];
         let csv = '\uFEFF' + headers.join(',') + '\n';
-        
+
         extractedPosts.forEach(post => {
             const row = [
                 `"${(post.postId || '').replace(/"/g, '""')}"`,
@@ -641,27 +643,28 @@ function downloadCSV() {
                 post.reactions,
                 `"${(post.time || '').replace(/"/g, '""')}"`,
                 post.hasMedia,
-                `"${(post.postType || '').replace(/"/g, '""')}"`
+                `"${(post.postType || '').replace(/"/g, '""')}"`,
+                post.isTruncated
             ];
             csv += row.join(',') + '\n';
         });
-        
+
         // إنشاء ملف وتنزيله
         const blob = new Blob([csv], { type: 'text/csv; charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const filename = `facebook_posts_${new Date().toISOString().split('T')[0]}.csv`;
-        
+
         // إرسال طلب التنزيل إلى background script
         chrome.runtime.sendMessage({
             action: 'downloadFile',
             url: url,
             filename: filename
         });
-        
+
         sendStatus(`✅ تم إنشاء ملف بـ ${extractedPosts.length} منشور`, 'success');
-        
+
     } catch (error) {
         console.error('❌ خطأ في إنشاء CSV:', error);
         sendStatus('❌ فشل في إنشاء الملف', 'error');
     }
-}
+}}
